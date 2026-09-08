@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#040711">
+  <title>ANTI-GRAVITY | Futuristic 3D Racing Game</title>
+  <meta name="description" content="Defy Gravity. Own the Track. High-speed 3D futuristic anti-gravity racing game with hover physics, AI opponents, boosts, and floating tracks.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head>
+<body>
+  <!-- 3D WebGL Canvas Container -->
+  <div id="game-container">
+    <canvas id="webgl-canvas"></canvas>
+    <canvas id="speedlines-canvas"></canvas>
+  </div>
+
+  <!-- Portrait Orientation Advisor (for Android / mobile) -->
+  <div id="orientation-advisor" class="orientation-advisor">
+    <div class="advisor-content">
+      <div class="rotate-device-icon">⟲ 📱</div>
+      <h2>ROTATE TO LANDSCAPE</h2>
+      <p>For the ultimate futuristic anti-gravity racing experience, please rotate your device to landscape mode.</p>
+      <button id="btn-dismiss-orientation" class="cyber-btn secondary small">CONTINUE ANYWAY</button>
+    </div>
+  </div>
+
+  <!-- In-Race HUD Overlay -->
+  <div id="hud" class="hud-overlay hidden">
+    <!-- Top Left: Position & Time -->
+    <div class="hud-box hud-top-left">
+      <div class="hud-badge">
+        <span class="hud-label">POS</span>
+        <div class="position-display"><span id="hud-pos">1</span><span class="pos-total"> / 6</span></div>
+      </div>
+      <div class="time-display">
+        <div class="time-row"><span class="time-label">TIME</span> <span id="hud-time" class="time-val">00:00.000</span></div>
+        <div class="time-row"><span class="time-label">BEST</span> <span id="hud-best-time" class="time-val">--:--.---</span></div>
+      </div>
+    </div>
+
+    <!-- Top Center: Lap, Auto-Drive & AI Pursuit Indicator -->
+    <div class="hud-box hud-top-center">
+      <div class="lap-display">
+        <span class="lap-tag">LAP</span>
+        <span id="hud-lap" class="lap-val">1 / 3</span>
+      </div>
+      <div id="hud-auto-drive-badge" class="auto-drive-badge">AUTO-DRIVE</div>
+      <div id="hud-chase-badge" class="hud-chase-badge hidden">⚡ PURSUIT: NOVA 25m</div>
+    </div>
+
+    <!-- Top Right: Speedometer, Power-Up & Quick Controls -->
+    <div class="hud-box hud-top-right">
+      <div class="speed-container">
+        <div class="speed-digital">
+          <span id="hud-speed" class="speed-number">0</span>
+          <span class="speed-unit">KM/H</span>
+        </div>
+        <div class="speed-bar-container">
+          <div id="speed-bar-fill" class="speed-bar-fill"></div>
+        </div>
+      </div>
+      <div class="powerup-slot-container">
+        <div id="powerup-slot" class="powerup-slot empty">
+          <span class="powerup-text">NO ITEM</span>
+        </div>
+      </div>
+      <div class="hud-quick-actions">
+        <button id="btn-touch-toggle" class="hud-mini-icon-btn" title="Toggle On-Screen Buttons (Mouse / Touch)">🎮</button>
+        <button id="btn-fullscreen-toggle" class="hud-mini-icon-btn" title="Toggle Fullscreen">⛶</button>
+        <button id="btn-pause-ingame" class="hud-mini-icon-btn" title="Pause Game">❚❚</button>
+      </div>
+    </div>
+
+    <!-- Center Alerts: Countdown, Lap Alerts, Respawn -->
+    <div id="hud-center-alert" class="hud-center-alert hidden">
+      <div id="alert-title" class="alert-title">3</div>
+      <div id="alert-subtitle" class="alert-subtitle">GET READY</div>
+    </div>
+
+    <!-- Bottom Left: Shield / Health Bar -->
+    <div class="hud-box hud-bottom-left">
+      <div class="shield-container">
+        <div class="shield-header">
+          <span class="shield-label">SHIELD</span>
+          <span id="shield-val" class="shield-val">100%</span>
+        </div>
+        <div class="shield-bar-bg">
+          <div id="shield-bar-fill" class="shield-bar-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Center: Curved Boost Meter -->
+    <div class="hud-box hud-bottom-center">
+      <div class="boost-meter-container">
+        <div class="boost-header">
+          <span class="boost-label">ION BOOST</span>
+          <span id="boost-val" class="boost-val">100%</span>
+        </div>
+        <div class="boost-bar-bg">
+          <div id="boost-bar-fill" class="boost-bar-fill"></div>
+        </div>
+        <div class="boost-hint">HOLD [BOOST] FOR MAXIMUM VELOCITY</div>
+      </div>
+    </div>
+
+    <!-- Bottom Right: Real-time Minimap Radar -->
+    <div class="hud-box hud-bottom-right">
+      <div class="minimap-container">
+        <canvas id="minimap-canvas" width="160" height="160"></canvas>
+      </div>
+    </div>
+
+    <!-- Android / Mobile Thumb Touch Controls -->
+    <div id="mobile-touch-controls" class="touch-controls-overlay">
+      <!-- Left Thumb Steering Zone (Large Touch Pad) -->
+      <div class="touch-zone-left" id="touch-steer-zone">
+        <div class="steer-cluster">
+          <button id="touch-left" class="touch-pad-btn steer-btn-left" aria-label="Steer Left">
+            <span class="touch-arrow">◀</span>
+            <span class="touch-sublabel">LEFT</span>
+          </button>
+          <button id="touch-right" class="touch-pad-btn steer-btn-right" aria-label="Steer Right">
+            <span class="touch-arrow">▶</span>
+            <span class="touch-sublabel">RIGHT</span>
+          </button>
+        </div>
+        <div class="steer-hint-text">TAP OR SLIDE THUMB TO STEER</div>
+      </div>
+
+      <!-- Right Thumb Action Cluster (Boost, Drift, Item, Brake) -->
+      <div class="touch-zone-right">
+        <!-- Huge Ion Boost Button (Easy thumb reach) -->
+        <button id="touch-boost" class="touch-main-btn boost-touch-btn" aria-label="Ion Boost">
+          <span class="touch-btn-glow"></span>
+          <span class="touch-btn-icon">⚡</span>
+          <span class="touch-btn-label">BOOST</span>
+        </button>
+
+        <div class="touch-secondary-row">
+          <button id="touch-drift" class="touch-secondary-btn drift-touch-btn" aria-label="Drift">
+            <span class="touch-btn-icon">↺</span>
+            <span class="touch-btn-label">DRIFT</span>
+          </button>
+          <button id="touch-brake" class="touch-secondary-btn brake-touch-btn" aria-label="Brake">
+            <span class="touch-btn-icon">🛑</span>
+            <span class="touch-btn-label">BRAKE</span>
+          </button>
+        </div>
+
+        <!-- Touch Item Activation Button (Appears when powerup is held) -->
+        <button id="touch-item" class="touch-item-btn hidden" aria-label="Use Item">
+          <span class="item-badge-text">USE ITEM</span>
+        </button>
+      </div>
+
+      <!-- Quick Respawn Button (Top Right Corner) -->
+      <button id="touch-respawn" class="touch-respawn-btn" aria-label="Respawn Vehicle">
+        <span>⟳ RESPAWN</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Screen UI Overlay Container -->
+  <div id="ui-overlay" class="ui-overlay">
+
+    <!-- MAIN MENU SCREEN -->
+    <div id="screen-main-menu" class="ui-screen active">
+      <div class="menu-hero">
+        <div class="hero-brand">
+          <div class="brand-glitch-badge">ANTI-GRAVITY RACING LEAGUE</div>
+          <h1 class="brand-title">ANTI-GRAVITY</h1>
+          <p class="brand-tagline">DEFY GRAVITY. OWN THE TRACK.</p>
+        </div>
+        <div class="menu-actions">
+          <button id="btn-menu-start" class="cyber-btn primary large">
+            <span class="btn-glow"></span>
+            <span class="btn-text">START RACE ❯</span>
+          </button>
+          <button id="btn-menu-garage" class="cyber-btn secondary">
+            <span class="btn-text">VEHICLE GARAGE</span>
+          </button>
+          <button id="btn-menu-tracks" class="cyber-btn secondary">
+            <span class="btn-text">TRACK SELECTION</span>
+          </button>
+          <button id="btn-menu-how" class="cyber-btn secondary">
+            <span class="btn-text">HOW TO PLAY</span>
+          </button>
+          <button id="btn-menu-settings" class="cyber-btn secondary">
+            <span class="btn-text">SETTINGS</span>
+          </button>
+        </div>
+        <div class="user-stats-bar">
+          <div class="stat-pill"><span class="stat-title">PILOT LEVEL</span> <span id="user-level" class="stat-num">1</span></div>
+          <div class="stat-pill"><span class="stat-title">CREDITS</span> <span id="user-credits" class="stat-num">1,000 CR</span></div>
+          <div class="stat-pill"><span class="stat-title">VICTORIES</span> <span id="user-wins" class="stat-num">0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRACK SELECTION SCREEN -->
+    <div id="screen-track-select" class="ui-screen hidden">
+      <div class="screen-header">
+        <button id="btn-track-back" class="nav-back-btn">← BACK</button>
+        <h2 class="screen-title">SELECT CIRCUIT</h2>
+        <div class="screen-subtitle">CHOOSE YOUR CHALLENGE</div>
+      </div>
+      <div class="track-cards-grid">
+        <!-- Track 1: Skyline -->
+        <div class="track-card selected" data-track="0">
+          <div class="track-card-preview track-preview-1">
+            <div class="track-diff-badge easy">BEGINNER</div>
+            <div class="track-name">SKYLINE CIRCUIT</div>
+          </div>
+          <div class="track-card-body">
+            <p class="track-desc">Wide glowing raceway weaving through towering mega-structures and holographic rings. Gentle banked turns and jump ramps.</p>
+            <div class="track-meta">
+              <div><span>LENGTH:</span> <strong>3.2 KM</strong></div>
+              <div><span>DIFFICULTY:</span> <strong class="diff-text-easy">CLASS 1</strong></div>
+              <div><span>BEST RECORD:</span> <strong id="best-track-0">--:--.---</strong></div>
+            </div>
+            <button class="track-select-btn">SELECT TRACK</button>
+          </div>
+        </div>
+
+        <!-- Track 2: Neon Core -->
+        <div class="track-card" data-track="1">
+          <div class="track-card-preview track-preview-2">
+            <div class="track-diff-badge medium">INTERMEDIATE</div>
+            <div class="track-name">NEON CORE</div>
+          </div>
+          <div class="track-card-body">
+            <p class="track-desc">Multi-level corkscrews, tight chicane corners, plasma tunnels, moving hazard barriers, and 4 high-speed boost strips.</p>
+            <div class="track-meta">
+              <div><span>LENGTH:</span> <strong>4.1 KM</strong></div>
+              <div><span>DIFFICULTY:</span> <strong class="diff-text-med">CLASS 2</strong></div>
+              <div><span>BEST RECORD:</span> <strong id="best-track-1">--:--.---</strong></div>
+            </div>
+            <button class="track-select-btn">SELECT TRACK</button>
+          </div>
+        </div>
+
+        <!-- Track 3: Void Run -->
+        <div class="track-card" data-track="2">
+          <div class="track-card-preview track-preview-3">
+            <div class="track-diff-badge hard">ADVANCED</div>
+            <div class="track-name">VOID RUN</div>
+          </div>
+          <div class="track-card-body">
+            <p class="track-desc">Floating disconnected orbital track segments, massive zero-g jumps, sharp hairpins, and a hazardous shortcut tunnel.</p>
+            <div class="track-meta">
+              <div><span>LENGTH:</span> <strong>5.0 KM</strong></div>
+              <div><span>DIFFICULTY:</span> <strong class="diff-text-hard">CLASS 3</strong></div>
+              <div><span>BEST RECORD:</span> <strong id="best-track-2">--:--.---</strong></div>
+            </div>
+            <button class="track-select-btn">SELECT TRACK</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="race-setup-footer">
+        <div class="setup-option">
+          <label for="select-laps">RACE LAPS</label>
+          <select id="select-laps" class="cyber-select">
+            <option value="2">2 LAPS (Sprint)</option>
+            <option value="3" selected>3 LAPS (Standard)</option>
+            <option value="5">5 LAPS (Endurance)</option>
+          </select>
+        </div>
+        <div class="setup-option">
+          <label for="select-difficulty">AI DIFFICULTY</label>
+          <select id="select-difficulty" class="cyber-select">
+            <option value="easy">CASUAL (Relaxed)</option>
+            <option value="medium" selected>PILOT (Competitive)</option>
+            <option value="hard">ELITE (Hardcore)</option>
+          </select>
+        </div>
+        <button id="btn-launch-race" class="cyber-btn primary large">
+          <span class="btn-text">ENGAGE RACE ❯</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- GARAGE SCREEN -->
+    <div id="screen-garage" class="ui-screen hidden">
+      <div class="screen-header">
+        <button id="btn-garage-back" class="nav-back-btn">← BACK</button>
+        <h2 class="screen-title">VEHICLE GARAGE</h2>
+        <div class="screen-subtitle">CUSTOMIZE YOUR ANTI-GRAV CRAFT</div>
+      </div>
+
+      <div class="garage-layout">
+        <div class="garage-viewer-hint">
+          <span>DRAG OR SWIPE TO ROTATE VEHICLE IN 3D</span>
+        </div>
+
+        <div class="garage-panel">
+          <div class="panel-section">
+            <h3 class="panel-title">CHASSIS MODEL</h3>
+            <div class="chassis-picker">
+              <button class="chassis-btn active" data-chassis="0">
+                <span class="chassis-name">AERO STRIKER</span>
+                <span class="chassis-desc">Balanced Speed & Handling</span>
+              </button>
+              <button class="chassis-btn" data-chassis="1">
+                <span class="chassis-name">VORTEX INTERCEPTOR</span>
+                <span class="chassis-desc">Agile & Fast Boosting</span>
+              </button>
+              <button class="chassis-btn" data-chassis="2">
+                <span class="chassis-name">TITAN ENFORCER</span>
+                <span class="chassis-desc">Heavy Shields & Top Velocity</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h3 class="panel-title">HULL COLOR</h3>
+            <div class="color-palette" id="palette-hull"></div>
+          </div>
+
+          <div class="panel-section">
+            <h3 class="panel-title">NEON ACCENT TRIM</h3>
+            <div class="color-palette" id="palette-neon"></div>
+          </div>
+
+          <div class="panel-section">
+            <h3 class="panel-title">ION EXHAUST GLOW</h3>
+            <div class="color-palette" id="palette-exhaust"></div>
+          </div>
+
+          <div class="panel-section stats-section">
+            <h3 class="panel-title">VEHICLE TELEMETRY</h3>
+            <div class="stat-bar-row">
+              <span class="stat-name">TOP VELOCITY</span>
+              <div class="stat-bar-bg"><div id="stat-bar-speed" class="stat-bar-fill" style="width: 82%;"></div></div>
+            </div>
+            <div class="stat-bar-row">
+              <span class="stat-name">ACCELERATION</span>
+              <div class="stat-bar-bg"><div id="stat-bar-accel" class="stat-bar-fill" style="width: 78%;"></div></div>
+            </div>
+            <div class="stat-bar-row">
+              <span class="stat-name">BANKING / HANDLING</span>
+              <div class="stat-bar-bg"><div id="stat-bar-handling" class="stat-bar-fill" style="width: 85%;"></div></div>
+            </div>
+            <div class="stat-bar-row">
+              <span class="stat-name">SHIELD STRENGTH</span>
+              <div class="stat-bar-bg"><div id="stat-bar-shield" class="stat-bar-fill" style="width: 80%;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS SCREEN -->
+    <div id="screen-settings" class="ui-screen hidden">
+      <div class="screen-header">
+        <button id="btn-settings-back" class="nav-back-btn">← BACK</button>
+        <h2 class="screen-title">SYSTEM SETTINGS</h2>
+        <div class="screen-subtitle">CONFIGURE MOBILE CONTROLS & EXPERIENCE</div>
+      </div>
+
+      <div class="settings-container">
+        <!-- Mobile Easy Play Group -->
+        <div class="settings-group">
+          <h3>TOUCH & EASY RACING</h3>
+          <div class="setting-item">
+            <label for="setting-autothrottle">AUTO-DRIVE (RECOMMENDED FOR TOUCH)</label>
+            <input type="checkbox" id="setting-autothrottle" checked class="cyber-toggle">
+          </div>
+          <div class="setting-item">
+            <label for="setting-assist">STEERING ASSIST (PREVENT WALL CRASHES)</label>
+            <input type="checkbox" id="setting-assist" checked class="cyber-toggle">
+          </div>
+          <div class="setting-item">
+            <label for="setting-haptics">HAPTIC VIBRATION FEEDBACK</label>
+            <input type="checkbox" id="setting-haptics" checked class="cyber-toggle">
+          </div>
+          <div class="setting-item">
+            <label for="setting-touch">TOUCH CONTROLS DISPLAY</label>
+            <select id="setting-touch" class="cyber-select">
+              <option value="auto" selected>AUTO DETECT (MOBILE / TABLET)</option>
+              <option value="on">ALWAYS VISIBLE</option>
+              <option value="off">HIDE (KEYBOARD ONLY)</option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <label for="setting-sensitivity">STEERING SENSITIVITY</label>
+            <input type="range" id="setting-sensitivity" min="50" max="180" value="110" class="cyber-slider">
+            <span id="setting-sensitivity-val">110%</span>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>AUDIO</h3>
+          <div class="setting-item">
+            <label for="vol-master">MASTER VOLUME</label>
+            <input type="range" id="vol-master" min="0" max="100" value="80" class="cyber-slider">
+            <span id="vol-master-val">80%</span>
+          </div>
+          <div class="setting-item">
+            <label for="vol-sfx">SFX & THRUSTERS</label>
+            <input type="range" id="vol-sfx" min="0" max="100" value="90" class="cyber-slider">
+            <span id="vol-sfx-val">90%</span>
+          </div>
+          <div class="setting-item">
+            <label for="vol-music">SYNTH MUSIC</label>
+            <input type="range" id="vol-music" min="0" max="100" value="70" class="cyber-slider">
+            <span id="vol-music-val">70%</span>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>GRAPHICS & DISPLAY</h3>
+          <div class="setting-item">
+            <label for="setting-graphics">GRAPHICS PRESET</label>
+            <select id="setting-graphics" class="cyber-select">
+              <option value="high" selected>ULTRA (Full FX & Particles)</option>
+              <option value="medium">BALANCED (Optimized)</option>
+              <option value="low">PERFORMANCE (Maximum FPS)</option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <label for="setting-shake">CAMERA SHAKE</label>
+            <input type="checkbox" id="setting-shake" checked class="cyber-toggle">
+          </div>
+          <div class="setting-item">
+            <label for="setting-fullscreen">FULLSCREEN MODE (MOBILE)</label>
+            <button id="btn-settings-fullscreen" class="cyber-btn secondary small">ENTER FULLSCREEN</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOW TO PLAY SCREEN -->
+    <div id="screen-how-to-play" class="ui-screen hidden">
+      <div class="screen-header">
+        <button id="btn-how-back" class="nav-back-btn">← BACK</button>
+        <h2 class="screen-title">PILOT MANUAL</h2>
+        <div class="screen-subtitle">TOUCH & KEYBOARD CONTROLS</div>
+      </div>
+
+      <div class="manual-container">
+        <div class="manual-col">
+          <h3>TOUCH / ANDROID CONTROLS</h3>
+          <ul class="manual-list">
+            <li><strong>Auto-Drive:</strong> On by default! Craft accelerates automatically so you can focus on steering and high-speed banking.</li>
+            <li><strong>Left Thumb:</strong> Tap or drag left/right on the steering pad to bank through turns.</li>
+            <li><strong>Hold Boost:</strong> Press the big glowing BOOST button for immense speed surges.</li>
+            <li><strong>Drift:</strong> Hold the DRIFT button around tight hairpins to charge bonus boost!</li>
+            <li><strong>Brake:</strong> Tap BRAKE to slow down for sharp chicanes.</li>
+            <li><strong>Use Item:</strong> Tap the gold ITEM button to deploy collected power-ups.</li>
+          </ul>
+        </div>
+
+        <div class="manual-col">
+          <h3>DESKTOP KEYBOARD</h3>
+          <div class="control-row"><span class="key-badge">W</span> / <span class="key-badge">↑</span> <span>ACCELERATE THRUST</span></div>
+          <div class="control-row"><span class="key-badge">S</span> / <span class="key-badge">↓</span> <span>BRAKE / REVERSE</span></div>
+          <div class="control-row"><span class="key-badge">A</span> / <span class="key-badge">←</span> <span>STEER LEFT & BANK</span></div>
+          <div class="control-row"><span class="key-badge">D</span> / <span class="key-badge">→</span> <span>STEER RIGHT & BANK</span></div>
+          <div class="control-row"><span class="key-badge">SPACE</span> <span>ION BOOST</span></div>
+          <div class="control-row"><span class="key-badge">SHIFT</span> <span>PLASMA DRIFT</span></div>
+          <div class="control-row"><span class="key-badge">E</span> / <span class="key-badge">F</span> <span>USE POWER-UP</span></div>
+          <div class="control-row"><span class="key-badge">R</span> <span>RESPAWN</span></div>
+        </div>
+
+        <div class="manual-col">
+          <h3>POWER-UP ARSENAL</h3>
+          <div class="powerup-info-grid">
+            <div class="p-card"><span class="p-badge turbo">TURBO</span> <span>Instant rocket propulsion burst.</span></div>
+            <div class="p-card"><span class="p-badge shield">SHIELD</span> <span>Hexagonal kinetic barrier absorbing collisions.</span></div>
+            <div class="p-card"><span class="p-badge magnet">MAGNET</span> <span>Pulls nearby energy pickups to your craft.</span></div>
+            <div class="p-card"><span class="p-badge phase">PHASE</span> <span>Pass through obstacles safely.</span></div>
+            <div class="p-card"><span class="p-badge blast">EMP BLAST</span> <span>Disrupts and slows nearby AI rivals.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAUSE SCREEN -->
+    <div id="screen-pause" class="ui-screen hidden modal-screen">
+      <div class="modal-card">
+        <h2 class="modal-title">RACE PAUSED</h2>
+        <div class="modal-actions">
+          <button id="btn-pause-resume" class="cyber-btn primary large">RESUME RACE</button>
+          <button id="btn-pause-restart" class="cyber-btn secondary">RESTART RACE</button>
+          <button id="btn-pause-settings" class="cyber-btn secondary">SETTINGS</button>
+          <button id="btn-pause-quit" class="cyber-btn danger">ABANDON RACE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RACE FINISH / RESULTS SCREEN -->
+    <div id="screen-results" class="ui-screen hidden modal-screen">
+      <div class="results-card">
+        <div class="results-header">
+          <div id="result-badge" class="result-badge gold">1st PLACE</div>
+          <h2 id="result-title" class="results-title">CHAMPION OF THE VOID</h2>
+          <div class="results-subtitle">RACE COMPLETED</div>
+        </div>
+
+        <div class="results-metrics">
+          <div class="metric-box">
+            <span class="metric-label">TOTAL TIME</span>
+            <span id="result-total-time" class="metric-val">02:45.321</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">BEST LAP</span>
+            <span id="result-best-lap" class="metric-val">00:52.140</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">XP REWARD</span>
+            <span id="result-xp" class="metric-val highlight">+450 XP</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">CREDITS WON</span>
+            <span id="result-credits" class="metric-val highlight">+1,200 CR</span>
+          </div>
+        </div>
+
+        <div class="leaderboard-container">
+          <h4 class="table-title">PILOT STANDINGS</h4>
+          <table class="standings-table">
+            <thead>
+              <tr>
+                <th>POS</th>
+                <th>PILOT</th>
+                <th>VEHICLE</th>
+                <th>TIME</th>
+                <th>GAP</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="results-actions">
+          <button id="btn-result-next" class="cyber-btn primary large">NEXT RACE ❯</button>
+          <button id="btn-result-retry" class="cyber-btn secondary">RETRY RACE</button>
+          <button id="btn-result-menu" class="cyber-btn secondary">MAIN MENU</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
